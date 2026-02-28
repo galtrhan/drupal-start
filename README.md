@@ -9,35 +9,35 @@ This project provides a Docker-based local development environment for Drupal 11
 
 ## Setup Guide
 
-### 1. Configuration (.env)
-Copy the template and set your project name:
-```bash
-cp .env.template .env
-```
-Default `PROJECT_NAME=drupal` will set your local domain to `drupal.local`.
-
-### 2. Initial Installation
-Run the following script to create your `.env` file, build Docker images, and download Drupal:
+### 1. Initial Installation
+Run the following script to create your `.env` file (interactively), build Docker images, and download Drupal:
 ```bash
 ./setup.sh
 ```
 
-### 3. Start Services
-Use the provided management script to handle `/etc/hosts` updates and HTTPS certificates:
+### 2. Start Services
+Use the management script to handle `/etc/hosts` updates, HTTPS certificates, and start the containers:
 ```bash
 ./site.sh start
 ```
 *Note: This will prompt for your sudo password to update `/etc/hosts`.*
 
-### 4. Drupal Installation
+### 3. Drupal Installation
 - Open [https://drupal.local](https://drupal.local)
 - **Database Settings (PostgreSQL):**
   - **Database name:** `drupal_db` (or as set in .env)
   - **Database username:** `drupal_user`
-  - **Database password:** `drupal_password`
+  - **Database password:** `verystrongpassword` (or as set in .env)
   - **Host:** `postgres`
 
 ## Maintenance
+
+### Management Script (site.sh)
+The `site.sh` script provides easy management of the containers and local configuration:
+
+- `./site.sh start`: Verifies ports 80/443, updates `/etc/hosts`, generates SSL certs, and starts containers.
+- `./site.sh stop`: Stops and removes all containers for the project.
+- `./site.sh restart`: Stops and then starts the environment again.
 
 ### Cleanup / Reset
 If you want to reset the project back to the clean boilerplate state (removes all Drupal files, database, and certs):
@@ -73,18 +73,12 @@ docker compose exec php composer require drupal/[module_name]
 ### Database Management
 To enter the PostgreSQL shell:
 ```bash
-docker compose exec postgres psql -U drupal_user -d drupal
+docker compose exec postgres psql -U drupal_user -d drupal_db
 ```
 
 ## Project Structure
 - `web/`: Drupal root (index.php, themes, modules).
 - `vendor/`: Composer-managed dependencies and Drush.
-- `nginx.conf`: Nginx server configuration.
+- `nginx.conf.template`: Template for Nginx server configuration.
 - `Dockerfile`: Custom PHP image definition.
 - `docker-compose.yml`: Service orchestration.
-
-## Permissions Note
-If you encounter permission issues in the web interface, run:
-```bash
-docker compose exec php sh -c "chmod -R 777 web/sites/default/files"
-```
