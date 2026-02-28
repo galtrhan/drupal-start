@@ -24,6 +24,9 @@ RUN docker-php-ext-install \
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Configure Git safe directory
+RUN git config --global --add safe.directory /var/www/html
+
 WORKDIR /var/www/html
 
 CMD ["php-fpm"]

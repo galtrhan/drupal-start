@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# A helper script to run Drush commands within the PHP container.
+
+# 0. Check if Docker is running
+if ! docker info > /dev/null 2>&1; then
+    echo -e "\033[0;31mError: Docker is not running.\033[0m"
+    exit 1
+fi
+
+# 1. Check if the container is running
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+PROJECT_NAME=${PROJECT_NAME:-"drupal"}
+CONTAINER_NAME="${PROJECT_NAME}_php"
+
+if [ ! "$(docker ps -q -f name=^/${CONTAINER_NAME}$)" ]; then
+    echo -e "\033[0;31mError: Container ${CONTAINER_NAME} is not running.\033[0m"
+    echo "Please start the environment first: ./site.sh start"
+    exit 1
+fi
+
+# 2. Run Drush
+docker compose exec php vendor/bin/drush "$@"

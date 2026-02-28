@@ -8,8 +8,8 @@ server {
     listen 443 ssl;
     server_name ${PROJECT_NAME}.local;
 
-    ssl_certificate /etc/nginx/certs/${PROJECT_NAME}.local.pem;
-    ssl_certificate_key /etc/nginx/certs/${PROJECT_NAME}.local-key.pem;
+    ssl_certificate /etc/nginx/certs/wildcard.pem;
+    ssl_certificate_key /etc/nginx/certs/wildcard-key.pem;
 
     root /var/www/html/web;
 

@@ -55,13 +55,13 @@ docker exec -it ${PROJECT_NAME}_php bash
 *(Alternatively, you can use `docker compose exec php bash`)*
 
 ### Using Drush
-Drush is installed as a Composer dependency. You can run it from the host using:
+Drush is installed as a Composer dependency. You can run it easily using the helper script:
 ```bash
-docker compose exec php vendor/bin/drush [command]
+./drush.sh [command]
 ```
 Example: Clear all caches:
 ```bash
-docker compose exec php vendor/bin/drush cr
+./drush.sh cr
 ```
 
 ### Using Composer

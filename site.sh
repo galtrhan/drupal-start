@@ -51,14 +51,14 @@ function setup_hosts() {
 }
 
 function setup_certs() {
-    if [ ! -f "$CERTS_DIR/${DOMAIN}.pem" ]; then
-        echo -e "${GREEN}Generating certificates with mkcert for $DOMAIN...${NC}"
+    if [ ! -f "$CERTS_DIR/wildcard.pem" ]; then
+        echo -e "${GREEN}Generating wildcard certificates for $DOMAIN and *.local...${NC}"
         mkdir -p "$CERTS_DIR"
         # Ensure mkcert is installed in the local trust store
         mkcert -install
-        mkcert -cert-file "$CERTS_DIR/${DOMAIN}.pem" -key-file "$CERTS_DIR/${DOMAIN}-key.pem" "$DOMAIN"
+        mkcert -cert-file "$CERTS_DIR/wildcard.pem" -key-file "$CERTS_DIR/wildcard-key.pem" "$DOMAIN" "*.local"
     else
-         echo -e "${GREEN}Certificates for $DOMAIN already exist.${NC}"
+         echo -e "${GREEN}Wildcard certificates already exist.${NC}"
     fi
 }
 
@@ -82,7 +82,7 @@ case "$1" in
         setup_certs
 
         # Final verification of certs
-        if [ ! -f "$CERTS_DIR/${DOMAIN}.pem" ]; then
+        if [ ! -f "$CERTS_DIR/wildcard.pem" ]; then
             echo -e "${RED}Error: Certificates were not generated successfully.${NC}"
             exit 1
         fi

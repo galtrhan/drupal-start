@@ -45,7 +45,15 @@ if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
 
     # 3. Remove runtime files
     # We use sudo for vendor/ and web/ because Docker often creates files as root
+    echo -e "${GREEN}Removing project files and certificates...${NC}"
     sudo rm -rf .env certs/ web/ vendor/ recipes/ composer.json composer.lock .editorconfig .gitattributes LICENSE.txt
+    
+    echo -e ""
+    echo -e "${GREEN}Note: Project-specific certificates have been removed.${NC}"
+    echo -e "The mkcert Root CA remains installed in your system trust store."
+    echo -e "To find its location: ${GREEN}mkcert -CAROOT${NC}"
+    echo -e "To completely uninstall the Root CA: ${RED}mkcert -uninstall${NC}"
+    echo -e ""
     
     echo -e "${GREEN}Cleanup complete! Project is back to clean boilerplate state.${NC}"
 else
