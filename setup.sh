@@ -24,8 +24,28 @@ echo -e "${GREEN}Starting Drupal Local Environment Setup...${NC}"
 
 # 1. Initialize .env if it doesn't exist
 if [ ! -f .env ]; then
-    echo -e "${GREEN}Creating .env from .env.template...${NC}"
-    cp .env.template .env
+    echo -e "${GREEN}Creating .env interactively from .env.template...${NC}"
+    while IFS= read -u 3 -r line || [[ -n "$line" ]]; do
+        # Handle comments and empty lines
+        if [[ $line =~ ^[[:space:]]*# ]] || [[ -z "$line" ]]; then
+            echo "$line" >> .env
+        # Handle KEY=VALUE pairs
+        elif [[ $line =~ ^([^=]+)=(.*)$ ]]; then
+            key="${BASH_REMATCH[1]}"
+            default_value="${BASH_REMATCH[2]}"
+            
+            # Interactively ask for the value
+            read -p "$key [$default_value]: " user_input
+            
+            # Use default if input is empty
+            value=${user_input:-$default_value}
+            echo "$key=$value" >> .env
+        else
+            # Copy other lines as-is
+            echo "$line" >> .env
+        fi
+    done 3< .env.template
+    echo -e "${GREEN}.env file created successfully.${NC}"
 else
     echo -e "${GREEN}.env file already exists.${NC}"
 fi
