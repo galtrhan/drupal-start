@@ -1,13 +1,31 @@
 #!/bin/bash
 
 # Configuration
-PROJECT_NAME="drupal"
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+PROJECT_NAME=${PROJECT_NAME:-"drupal"}
 DOMAIN="${PROJECT_NAME}.local"
 CERTS_DIR="./certs"
 
 # Colors for output
 GREEN='\033[0;32m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+function check_ports() {
+    for port in 80 443; do
+        if sudo lsof -Pi :$port -sTCP:LISTEN -t >/dev/null ; then
+            echo -e "${RED}Error: Port $port is already in use.${NC}"
+            echo "Please stop any other web servers or containers using this port."
+            sudo lsof -i :$port
+            exit 1
+        fi
+    done
+}
 
 function setup_hosts() {
     if ! grep -q "$DOMAIN" /etc/hosts; then
@@ -19,12 +37,12 @@ function setup_hosts() {
 }
 
 function setup_certs() {
-    if [ ! -f "$CERTS_DIR/drupal.local.pem" ]; then
+    if [ ! -f "$CERTS_DIR/${DOMAIN}.pem" ]; then
         echo -e "${GREEN}Generating certificates with mkcert for $DOMAIN...${NC}"
         mkdir -p "$CERTS_DIR"
         # Ensure mkcert is installed in the local trust store
         mkcert -install
-        mkcert -cert-file "$CERTS_DIR/drupal.local.pem" -key-file "$CERTS_DIR/drupal.local-key.pem" "$DOMAIN"
+        mkcert -cert-file "$CERTS_DIR/${DOMAIN}.pem" -key-file "$CERTS_DIR/${DOMAIN}-key.pem" "$DOMAIN"
     else
          echo -e "${GREEN}Certificates for $DOMAIN already exist.${NC}"
     fi
@@ -32,8 +50,29 @@ function setup_certs() {
 
 case "$1" in
     start)
+        # Check for web/index.php
+        if [ ! -f "web/index.php" ]; then
+            echo -e "${RED}Error: web/index.php not found.${NC}"
+            echo "Please run ./setup.sh first to initialize the Drupal project."
+            exit 1
+        fi
+
+        # If already running, restart
+        if [ "$(docker compose ps --format json | grep -c "running")" -gt 0 ]; then
+            echo -e "${GREEN}Site is already running. Restarting...${NC}"
+            docker compose down
+        fi
+
+        check_ports
         setup_hosts
         setup_certs
+
+        # Final verification of certs
+        if [ ! -f "$CERTS_DIR/${DOMAIN}.pem" ]; then
+            echo -e "${RED}Error: Certificates were not generated successfully.${NC}"
+            exit 1
+        fi
+
         echo -e "${GREEN}Starting site...${NC}"
         docker compose up -d
         echo -e "${GREEN}Site is available at https://$DOMAIN${NC}"

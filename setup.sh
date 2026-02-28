@@ -3,7 +3,22 @@ set -e
 
 # Colors for output
 GREEN='\033[0;32m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+# 0. Check permissions
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${RED}Error: Please do not run this script as root/sudo.${NC}"
+    echo "Composer and mkcert should be run as your regular user."
+    exit 1
+fi
+
+# Ensure current directory is owned by the current user
+CURRENT_OWNER=$(stat -c '%U' .)
+if [ "$CURRENT_OWNER" == "root" ]; then
+    echo -e "${GREEN}Fixing directory ownership...${NC}"
+    sudo chown -R $(whoami):$(id -gn) .
+fi
 
 echo -e "${GREEN}Starting Drupal Local Environment Setup...${NC}"
 
@@ -22,10 +37,12 @@ docker compose build
 # 3. Initialize Drupal project if web/index.php doesn't exist
 if [ ! -f web/index.php ]; then
     echo -e "${GREEN}Initializing Drupal project with Composer...${NC}"
-    docker compose run --rm php sh -c "composer create-project drupal/recommended-project /tmp/drupal && cp -rn /tmp/drupal/. /var/www/html/ && rm -rf /tmp/drupal"
+    # Remove any existing partial installation files to ensure a clean start
+    sudo rm -rf /tmp/drupal_init
+    docker compose run --rm php sh -c "composer create-project drupal/recommended-project /tmp/drupal_init --no-interaction && cp -a /tmp/drupal_init/. /var/www/html/ && rm -rf /tmp/drupal_init"
     
     echo -e "${GREEN}Installing Drush...${NC}"
-    docker compose run --rm php composer require drush/drush
+    docker compose run --rm php composer require drush/drush --no-interaction
 else
     echo -e "${GREEN}Drupal project already initialized (web/index.php exists).${NC}"
 fi
