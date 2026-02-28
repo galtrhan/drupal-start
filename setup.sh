@@ -39,12 +39,29 @@ if [ ! -f web/index.php ]; then
     echo -e "${GREEN}Initializing Drupal project with Composer...${NC}"
     # Remove any existing partial installation files to ensure a clean start
     sudo rm -rf /tmp/drupal_init
-    docker compose run --rm php sh -c "composer create-project drupal/recommended-project /tmp/drupal_init --no-interaction && cp -a /tmp/drupal_init/. /var/www/html/ && rm -rf /tmp/drupal_init"
+    docker compose run --rm php sh -c "git config --global --add safe.directory /var/www/html && composer create-project drupal/recommended-project /tmp/drupal_init --no-interaction && cp -a /tmp/drupal_init/. /var/www/html/ && rm -rf /tmp/drupal_init"
     
     echo -e "${GREEN}Installing Drush...${NC}"
     docker compose run --rm php composer require drush/drush --no-interaction
 else
     echo -e "${GREEN}Drupal project already initialized (web/index.php exists).${NC}"
+fi
+
+# 4. Fix permissions and create required directories
+echo -e "${GREEN}Setting up Drupal files directory and permissions...${NC}"
+mkdir -p web/sites/default/files/translations
+chmod -R 777 web/sites/default/files
+
+if [ ! -f web/sites/default/settings.php ]; then
+    echo -e "${GREEN}Creating settings.php...${NC}"
+    cp web/sites/default/default.settings.php web/sites/default/settings.php
+    chmod 666 web/sites/default/settings.php
+fi
+
+if [ ! -f web/sites/default/services.yml ]; then
+    echo -e "${GREEN}Creating services.yml...${NC}"
+    cp web/sites/default/default.services.yml web/sites/default/services.yml
+    chmod 666 web/sites/default/services.yml
 fi
 
 echo -e ""
