@@ -1,0 +1,29 @@
+FROM php:8.3-fpm-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    libpq-dev \
+    libpng-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    git \
+    icu-dev \
+    oniguruma-dev \
+    linux-headers
+
+# Install PHP extensions
+RUN docker-php-ext-install \
+    pdo_pgsql \
+    gd \
+    zip \
+    bcmath \
+    intl \
+    opcache
+
+# Get latest Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+CMD ["php-fpm"]

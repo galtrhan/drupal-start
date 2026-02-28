@@ -1,0 +1,61 @@
+server {
+    listen 80;
+    server_name ${PROJECT_NAME}.local;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${PROJECT_NAME}.local;
+
+    ssl_certificate /etc/nginx/certs/${PROJECT_NAME}.local.pem;
+    ssl_certificate_key /etc/nginx/certs/${PROJECT_NAME}.local-key.pem;
+
+    root /var/www/html/web;
+
+    location / {
+        try_files $uri /index.php?$query_string;
+    }
+
+    location @rewrite {
+        rewrite ^ /index.php;
+    }
+
+    # Don't allow direct access to PHP files in the vendor directory.
+    location ~ /vendor/.*\.php$ {
+        deny all;
+        return 404;
+    }
+
+    location ~ '\.php$|^/update.php' {
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+        
+        # Ensure that the path info is properly passed to PHP-FPM
+        set $path_info $fastcgi_path_info;
+        fastcgi_param PATH_INFO $path_info;
+
+        # Mitigate httpoxy vulnerability
+        fastcgi_param HTTP_PROXY "";
+
+        fastcgi_pass php:9000;
+        include fastcgi_params;
+        
+        # The script filename is required for PHP-FPM to find the file
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_intercept_errors on;
+    }
+
+    location ~ ^/sites/.*/files/styles/ { 
+        try_files $uri @rewrite;
+    }
+
+    location ~ ^(/[a-z\-]+)?/system/files/ { 
+        try_files $uri /index.php?$query_string;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        try_files $uri @rewrite;
+        expires max;
+        log_not_found off;
+    }
+}
