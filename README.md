@@ -12,13 +12,13 @@ This project provides a Docker-based local development environment for Drupal 11
 ### 1. Initial Installation
 Run the following script to create your `.env` file (interactively), build Docker images, and download Drupal:
 ```bash
-./setup.sh
+./site setup
 ```
 
 ### 2. Start Services
 Use the management script to handle `/etc/hosts` updates, HTTPS certificates, and start the containers:
 ```bash
-./site.sh start
+./site start
 ```
 *Note: This will prompt for your sudo password to update `/etc/hosts`.*
 
@@ -32,18 +32,14 @@ Use the management script to handle `/etc/hosts` updates, HTTPS certificates, an
 
 ## Maintenance
 
-### Management Script (site.sh)
-The `site.sh` script provides easy management of the containers and local configuration:
+### Management Script (site)
+The `./site` script provides easy management of the containers and local configuration:
 
-- `./site.sh start`: Verifies ports 80/443, updates `/etc/hosts`, generates SSL certs, and starts containers.
-- `./site.sh stop`: Stops and removes all containers for the project.
-- `./site.sh restart`: Stops and then starts the environment again.
-
-### Cleanup / Reset
-If you want to reset the project back to the clean boilerplate state (removes all Drupal files, database, and certs):
-```bash
-./reset.sh
-```
+- `./site setup`: Interactively creates `.env`, builds images, and initializes Drupal.
+- `./site start`: Verifies ports 80/443, updates `/etc/hosts`, generates SSL certs, and starts containers.
+- `./site stop`: Stops and removes all containers for the project.
+- `./site restart`: Stops and then starts the environment again.
+- `./site reset`: Danger: Resets the project back to the clean boilerplate state.
 
 ## Common Tasks
 
@@ -57,11 +53,11 @@ docker exec -it ${PROJECT_NAME}_php bash
 ### Using Drush
 Drush is installed as a Composer dependency. You can run it easily using the helper script:
 ```bash
-./drush.sh [command]
+./drush [command]
 ```
 Example: Clear all caches:
 ```bash
-./drush.sh cr
+./drush cr
 ```
 
 ### Using Composer

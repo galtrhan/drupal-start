@@ -14,12 +14,13 @@ if [ -f .env ]; then
     source .env
     set +a
 fi
+
 PROJECT_NAME=${PROJECT_NAME:-"drupal"}
 CONTAINER_NAME="${PROJECT_NAME}_php"
 
 if [ ! "$(docker ps -q -f name=^/${CONTAINER_NAME}$)" ]; then
     echo -e "\033[0;31mError: Container ${CONTAINER_NAME} is not running.\033[0m"
-    echo "Please start the environment first: ./site.sh start"
+    echo "Please start the environment first: ./site start"
     exit 1
 fi
 

@@ -1,0 +1,217 @@
+#!/bin/bash
+
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+# requires mkcert
+
+CERTS_DIR="./certs"
+DOMAIN="$PROJECT_NAME.local"
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${RED}Error: Please do not run this script as root/sudo.${NC}"
+    echo "Composer and mkcert should be run as your regular user."
+    exit 1
+fi
+
+
+CURRENT_OWNER=$(stat -c '%U' .)
+if [ "$CURRENT_OWNER" == "root" ]; then
+    echo -e "${GREEN}Fixing directory ownership...${NC}"
+    sudo chown -R $(whoami):$(id -gn) .
+fi
+
+
+function check_ports() {
+    for port in 80 443; do
+        if sudo lsof -Pi :$port -sTCP:LISTEN -t >/dev/null ; then
+            echo -e "${RED}Error: Port $port is already in use.${NC}"
+            echo "Please stop any other web servers or containers using this port."
+            sudo lsof -i :$port
+            exit 1
+        fi
+    done
+}
+
+
+function setup_certs() {
+    if [ ! -f "$CERTS_DIR/wildcard.pem" ]; then
+        echo -e "${GREEN}Generating wildcard certificates for *.local and $DOMAIN...${NC}"
+        mkdir -p "$CERTS_DIR"
+        mkcert -install
+        mkcert -cert-file "$CERTS_DIR/wildcard.pem" -key-file "$CERTS_DIR/wildcard-key.pem" "*.local" "$DOMAIN"
+    else
+         echo -e "${GREEN}Wildcard certificates already exist.${NC}"
+    fi
+
+    if [ ! -f "$CERTS_DIR/wildcard.pem" ]; then
+        echo -e "${RED}Error: Certificates were not generated successfully.${NC}"
+        exit 1
+    fi
+}
+
+
+function setup_hosts() {
+    if ! grep -q "$DOMAIN" /etc/hosts; then
+        echo -e "${GREEN}Adding $DOMAIN to /etc/hosts...${NC}"
+        echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts > /dev/null
+    else
+        echo -e "${GREEN}$DOMAIN already in /etc/hosts.${NC}"
+    fi
+}
+
+
+function setup_env() {
+    echo -e "${GREEN}Creating .env interactively from .env.template...${NC}"
+    while IFS= read -u 3 -r line || [[ -n "$line" ]]; do
+        # Handle comments and empty lines
+        if [[ $line =~ ^[[:space:]]*# ]] || [[ -z "$line" ]]; then
+            echo "$line" >> .env
+        # Handle KEY=VALUE pairs
+        elif [[ $line =~ ^([^=]+)=(.*)$ ]]; then
+            key="${BASH_REMATCH[1]}"
+            default_value="${BASH_REMATCH[2]}"
+            
+            # Interactively ask for the value
+            read -p "$key [$default_value]: " user_input
+            
+            # Use default if input is empty
+            value=${user_input:-$default_value}
+            echo "$key=$value" >> .env
+        else
+            # Copy other lines as-is
+            echo "$line" >> .env
+        fi
+    done 3< .env.template
+    echo -e "${GREEN}.env file created successfully.${NC}"
+}
+
+
+case "$1" in
+    setup)
+        echo -e "${GREEN}Starting Local Environment Setup...${NC}"
+        
+        if [ ! -f .env ]; then
+            setup_env
+        else
+            echo -e "${GREEN}.env file already exists.${NC}"
+        fi
+        
+        echo -e "${GREEN}Building Docker images...${NC}"
+        docker compose build
+
+        # 3. Initialize Drupal project if web/index.php doesn't exist
+        if [ ! -f web/index.php ]; then
+            echo -e "${GREEN}Initializing Drupal project with Composer...${NC}"
+            # Remove any existing partial installation files to ensure a clean start
+            sudo rm -rf /tmp/drupal_init
+            docker compose run --rm php sh -c "composer create-project drupal/recommended-project /tmp/drupal_init --no-interaction && cp -a /tmp/drupal_init/. /var/www/html/ && rm -rf /tmp/drupal_init"
+            
+            echo -e "${GREEN}Fixing project ownership...${NC}"
+            sudo chown -R $(whoami):$(id -gn) .
+            
+            echo -e "${GREEN}Installing Drush...${NC}"
+            docker compose run --rm php composer require drush/drush --no-interaction
+        else
+            echo -e "${GREEN}Drupal project already initialized (web/index.php exists).${NC}"
+        fi
+
+        # 4. Fix permissions and create required directories
+        echo -e "${GREEN}Setting up Drupal files directory and permissions...${NC}"
+        sudo mkdir -p web/sites/default/files/translations
+        sudo chmod -R 777 web/sites/default/files
+
+        if [ ! -f web/sites/default/settings.php ]; then
+            echo -e "${GREEN}Creating settings.php...${NC}"
+            sudo cp web/sites/default/default.settings.php web/sites/default/settings.php
+            sudo chmod 666 web/sites/default/settings.php
+            sudo chown $(whoami):$(id -gn) web/sites/default/settings.php
+            sed -i "s|\(config_sync_directory'\] = \).*|\1'./../config/sync/';|" web/sites/default/settings.php
+        fi
+
+        if [ ! -f web/sites/default/services.yml ]; then
+            echo -e "${GREEN}Creating services.yml...${NC}"
+            sudo cp web/sites/default/default.services.yml web/sites/default/services.yml
+            sudo chmod 666 web/sites/default/services.yml
+            sudo chown $(whoami):$(id -gn) web/sites/default/services.yml
+        fi
+
+        echo -e ""
+        echo -e "${GREEN}Setup complete!${NC}"
+        ;;
+    start)
+        # If already running, restart
+        if [ "$(docker compose ps --format json | grep -c "running")" -gt 0 ]; then
+            echo -e "${GREEN}Site is already running. Restarting...${NC}"
+            docker compose down
+        fi
+
+        echo -e "${GREEN}Starting site...${NC}"
+        check_ports
+        setup_hosts
+        setup_certs
+        docker compose up -d
+        echo -e "${GREEN}Site is available at https://$DOMAIN${NC}"
+        ;;
+    stop)
+        echo -e "${GREEN}Stopping site...${NC}"
+        docker compose down
+        ;;
+    restart)
+        $0 stop
+        $0 start
+        ;;
+    reset)
+        echo -e "${RED}Danger: This will remove all Local Setup files, database, and local certificates to reset the boilerplate.${NC}"
+        read -p "Are you sure you want to continue? (y/N) " confirm
+        if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+            echo -e "${GREEN}Cleaning up environment...${NC}"
+            
+            echo -e "${GREEN}Stopping project containers...${NC}"
+            docker compose down -v || true
+            
+            for port in 80 443; do
+                if sudo lsof -Pi :$port -sTCP:LISTEN -t >/dev/null ; then
+                    echo -e "${RED}Warning: Something is still using port $port.${NC}"
+                    read -p "Would you like to stop ALL running docker containers to free up ports? (y/N) " stop_all
+                    if [[ $stop_all == [yY] ]]; then
+                        docker stop $(docker ps -q) || true
+                    fi
+                    break
+                fi
+            done
+            
+            if grep -q "$DOMAIN" /etc/hosts; then
+                echo -e "${GREEN}Removing $DOMAIN from /etc/hosts...${NC}"
+                sudo sed -i "/$DOMAIN/d" /etc/hosts
+            fi
+
+            echo -e "${GREEN}Removing project files and certificates...${NC}"
+            sudo rm -rf .env certs/ web/ vendor/ recipes/ composer.json composer.lock .editorconfig .gitattributes LICENSE.txt
+            
+            echo -e ""
+            echo -e "${GREEN}Note: Project-specific certificates have been removed.${NC}"
+            echo -e "The mkcert Root CA remains installed in your system trust store."
+            echo -e "To find its location: ${GREEN}mkcert -CAROOT${NC}"
+            echo -e "To completely uninstall the Root CA: ${RED}mkcert -uninstall${NC}"
+            echo -e ""
+            
+            echo -e "${GREEN}Cleanup complete! Project is back to clean boilerplate state.${NC}"
+        else
+            echo -e "Cleanup cancelled."
+        fi
+        ;;
+    *)  
+        echo "Usage: $0 {setup|start|stop|restart|reset}"
+        exit 1
+        ;;
+esac
+    
