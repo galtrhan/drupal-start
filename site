@@ -43,9 +43,12 @@ function check_ports() {
 
 
 function setup_certs() {
+    mkdir -p "$CERTS_DIR"
+    if [ "$(stat -c '%U' "$CERTS_DIR")" = "root" ]; then
+        sudo chown "$(whoami):$(id -gn)" "$CERTS_DIR"
+    fi
     if [ ! -f "$CERTS_DIR/wildcard.pem" ]; then
         echo -e "${GREEN}Generating wildcard certificates for *.local and $DOMAIN...${NC}"
-        mkdir -p "$CERTS_DIR"
         mkcert -install
         mkcert -cert-file "$CERTS_DIR/wildcard.pem" -key-file "$CERTS_DIR/wildcard-key.pem" "$DOMAIN" "www.$DOMAIN"
     else
@@ -98,7 +101,9 @@ function setup_env() {
 case "$1" in
     setup)
         echo -e "${GREEN}Starting Local Environment Setup...${NC}"
-        
+
+        mkdir -p "$CERTS_DIR"
+
         if [ ! -f .env ]; then
             setup_env
         else
@@ -148,19 +153,18 @@ case "$1" in
         echo -e "${GREEN}Setup complete!${NC}"
         ;;
     start)
-        # If already running, restart
-        if [ "$(docker compose ps --format json | grep -c "running")" -gt 0 ]; then
-            echo -e "${GREEN}Site is already running. Restarting...${NC}"
-            docker compose restart
-            echo -e "${GREEN}Site is available at https://$DOMAIN${NC}"
-            exit 0
-        fi
-
-        echo -e "${GREEN}Starting site...${NC}"
         check_ports
         setup_hosts
         setup_certs
-        docker compose up -d
+
+        if docker compose ps --format json | grep -q '"running"'; then
+            echo -e "${GREEN}Site is already running. Restarting...${NC}"
+            docker compose restart
+        else
+            echo -e "${GREEN}Starting site...${NC}"
+            docker compose up -d
+        fi
+
         echo -e "${GREEN}Site is available at https://$DOMAIN${NC}"
         ;;
     stop)

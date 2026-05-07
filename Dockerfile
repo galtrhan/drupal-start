@@ -2,6 +2,8 @@ FROM php:8.3-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
+    autoconf \
+    build-base \
     libpq-dev \
     libpng-dev \
     libzip-dev \
