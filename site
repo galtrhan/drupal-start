@@ -133,6 +133,8 @@ case "$1" in
         echo -e "${GREEN}Setting up Drupal files directory and permissions...${NC}"
         sudo mkdir -p web/sites/default/files/translations
         sudo chmod -R 775 web/sites/default/files
+        # PHP-FPM runs as www-data; root-owned 775 dirs are not writable by www-data on the bind mount
+        docker compose run --rm -u root php chown -R www-data:www-data /var/www/html/web/sites/default/files
 
         if [ ! -f web/sites/default/settings.php ]; then
             echo -e "${GREEN}Creating settings.php...${NC}"
