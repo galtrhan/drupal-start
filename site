@@ -99,26 +99,73 @@ function setup_env() {
 
 
 # Replace default empty $databases so the web installer skips the DB step.
-# Reads DB_* from the environment (export from .env); PHP-FPM often does not pass
-# container env to workers, so literals here are reliable for the browser installer.
+# Reads DB_* from the project .env file (parsed in Python). Using `source .env` would
+# mangle values (e.g. $ in passwords, # as comment) and often leave DB_PASSWORD empty.
 function inject_settings_database_from_env() {
     local settings_file="web/sites/default/settings.php"
     [ -f "$settings_file" ] || return 0
     python3 - "$settings_file" <<'PY'
-import os, re, sys
+import re, sys
+from pathlib import Path
+from typing import Optional
+
 
 def php_quote(s: str) -> str:
     return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
-path = sys.argv[1]
-db_name = os.environ.get("DB_NAME", "drupal_db")
-db_user = os.environ.get("DB_USER", "drupal_user")
-db_password = os.environ.get("DB_PASSWORD", "")
-db_host = os.environ.get("DB_HOST", "postgres")
-db_port = os.environ.get("DB_PORT", "5432")
 
-with open(path, "r", encoding="utf-8") as f:
-    content = f.read()
+def find_dotenv(start_dir: Path) -> Optional[Path]:
+    cur = start_dir.resolve()
+    while True:
+        candidate = cur / ".env"
+        if candidate.is_file():
+            return candidate
+        parent = cur.parent
+        if parent == cur:
+            return None
+        cur = parent
+
+
+def parse_env_file(path: Path) -> dict[str, str]:
+    env: dict[str, str] = {}
+    text = path.read_text(encoding="utf-8")
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in ('"', "'"):
+            val = val[1:-1]
+        env[key] = val
+    return env
+
+
+path = Path(sys.argv[1])
+dotenv_path = find_dotenv(path.parent)
+defaults = {
+    "DB_NAME": "drupal_db",
+    "DB_USER": "drupal_user",
+    "DB_PASSWORD": "",
+    "DB_HOST": "postgres",
+    "DB_PORT": "5432",
+}
+vals = dict(defaults)
+if dotenv_path is not None:
+    vals.update(parse_env_file(dotenv_path))
+
+db_name = vals["DB_NAME"]
+db_user = vals["DB_USER"]
+db_password = vals["DB_PASSWORD"]
+db_host = vals["DB_HOST"]
+db_port = vals["DB_PORT"]
+
+content = path.read_text(encoding="utf-8")
 pattern = r"\$databases\s*=\s*\[\]\s*;"
 replacement = f"""$databases['default']['default'] = [
   'database' => {php_quote(db_name)},
@@ -131,8 +178,7 @@ replacement = f"""$databases['default']['default'] = [
 ];"""
 new_content, n = re.subn(pattern, replacement, content, count=1)
 if n == 1:
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new_content)
+    path.write_text(new_content, encoding="utf-8")
 sys.exit(0)
 PY
 }
@@ -183,9 +229,6 @@ case "$1" in
             sudo chown $(whoami):$(id -gn) web/sites/default/settings.php
             sed -i "s|\(config_sync_directory'\] = \).*|\1'./../config/sync/';|" web/sites/default/settings.php
         fi
-        set -a
-        [ -f .env ] && source .env
-        set +a
         inject_settings_database_from_env
 
         if [ ! -f web/sites/default/services.yml ]; then
