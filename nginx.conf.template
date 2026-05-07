@@ -13,6 +13,13 @@ server {
 
     root /var/www/html/web;
 
+    server_tokens off;
+    client_max_body_size 64m;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
     location / {
         try_files $uri /index.php?$query_string;
     }
@@ -29,7 +36,7 @@ server {
 
     location ~ '\.php$|^/update.php' {
         fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
-        
+
         # Ensure that the path info is properly passed to PHP-FPM
         set $path_info $fastcgi_path_info;
         fastcgi_param PATH_INFO $path_info;
@@ -38,18 +45,19 @@ server {
         fastcgi_param HTTP_PROXY "";
 
         fastcgi_pass php:9000;
+        fastcgi_read_timeout 300;
         include fastcgi_params;
-        
+
         # The script filename is required for PHP-FPM to find the file
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_intercept_errors on;
     }
 
-    location ~ ^/sites/.*/files/styles/ { 
+    location ~ ^/sites/.*/files/styles/ {
         try_files $uri @rewrite;
     }
 
-    location ~ ^(/[a-z\-]+)?/system/files/ { 
+    location ~ ^(/[a-z\-]+)?/system/files/ {
         try_files $uri /index.php?$query_string;
     }
 

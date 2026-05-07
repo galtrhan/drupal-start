@@ -47,7 +47,7 @@ function setup_certs() {
         echo -e "${GREEN}Generating wildcard certificates for *.local and $DOMAIN...${NC}"
         mkdir -p "$CERTS_DIR"
         mkcert -install
-        mkcert -cert-file "$CERTS_DIR/wildcard.pem" -key-file "$CERTS_DIR/wildcard-key.pem" "*.local" "$DOMAIN"
+        mkcert -cert-file "$CERTS_DIR/wildcard.pem" -key-file "$CERTS_DIR/wildcard-key.pem" "$DOMAIN" "www.$DOMAIN"
     else
          echo -e "${GREEN}Wildcard certificates already exist.${NC}"
     fi
@@ -127,7 +127,7 @@ case "$1" in
         # 4. Fix permissions and create required directories
         echo -e "${GREEN}Setting up Drupal files directory and permissions...${NC}"
         sudo mkdir -p web/sites/default/files/translations
-        sudo chmod -R 777 web/sites/default/files
+        sudo chmod -R 775 web/sites/default/files
 
         if [ ! -f web/sites/default/settings.php ]; then
             echo -e "${GREEN}Creating settings.php...${NC}"
@@ -151,7 +151,9 @@ case "$1" in
         # If already running, restart
         if [ "$(docker compose ps --format json | grep -c "running")" -gt 0 ]; then
             echo -e "${GREEN}Site is already running. Restarting...${NC}"
-            docker compose down
+            docker compose restart
+            echo -e "${GREEN}Site is available at https://$DOMAIN${NC}"
+            exit 0
         fi
 
         echo -e "${GREEN}Starting site...${NC}"
@@ -194,8 +196,11 @@ case "$1" in
                 sudo sed -i "/$DOMAIN/d" /etc/hosts
             fi
 
+            echo -e "${GREEN}Fixing ownership before removal...${NC}"
+            sudo chown -R $(whoami):$(id -gn) .
+
             echo -e "${GREEN}Removing project files and certificates...${NC}"
-            sudo rm -rf .env certs/ web/ vendor/ recipes/ composer.json composer.lock .editorconfig .gitattributes LICENSE.txt
+            rm -rf .env certs/ web/ vendor/ recipes/ composer.json composer.lock .editorconfig .gitattributes LICENSE.txt
             
             echo -e ""
             echo -e "${GREEN}Note: Project-specific certificates have been removed.${NC}"

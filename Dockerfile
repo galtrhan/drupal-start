@@ -10,7 +10,7 @@ RUN apk add --no-cache \
     git \
     icu-dev \
     oniguruma-dev \
-    linux-headers
+    pcre-dev
 
 # Install PHP extensions
 RUN docker-php-ext-install \
@@ -21,8 +21,15 @@ RUN docker-php-ext-install \
     intl \
     opcache
 
+# Install APCu
+RUN pecl install apcu \
+    && docker-php-ext-enable apcu
+
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# PHP configuration
+COPY opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 
 # Configure Git safe directory
 RUN git config --global --add safe.directory /var/www/html
