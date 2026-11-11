@@ -1,80 +1,77 @@
-# Drupal Local Development Environment
+# Drupal local development environment
 
-This project provides a Docker-based local development environment for Drupal 11 using PHP-FPM, Nginx, and PostgreSQL.
+A local Drupal 11 stack with Docker, Nginx, PHP-FPM and PostgreSQL. Use it for module and theme development.
 
-## Prerequisites
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- [mkcert](https://github.com/FiloSottile/mkcert) (for local HTTPS trust)
+## Requirements
 
-## Setup Guide
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- [mkcert](https://github.com/FiloSottile/mkcert), for local HTTPS certificates
 
-### 1. Initial Installation
-Run the following script to create your `.env` file (interactively), build Docker images, and download Drupal:
+## Setup
+
+1. Create your `.env`, build the Docker images and download Drupal:
+
 ```bash
 ./site setup
 ```
 
-### 2. Start Services
-Use the management script to handle `/etc/hosts` updates, HTTPS certificates, and start the containers:
+2. Start the containers, update `/etc/hosts` and generate the HTTPS certificates:
+
 ```bash
 ./site start
 ```
-*Note: This will prompt for your sudo password to update `/etc/hosts`.*
 
-### 3. Drupal Installation
-- Open [https://drupal.local](https://drupal.local)
-- **Database Settings (PostgreSQL):**
-  - **Database name:** `drupal_db` (or as set in .env)
-  - **Database username:** `drupal_user`
-  - **Database password:** `verystrongpassword` (or as set in .env)
-  - **Host:** `postgres`
+The script asks for your sudo password to edit `/etc/hosts`.
 
-## Maintenance
+3. Open https://drupal.local and run the Drupal installer. Database settings:
 
-### Management Script (site)
-The `./site` script provides easy management of the containers and local configuration:
+| Setting | Value |
+| --- | --- |
+| Name | `drupal_db`, or your `.env` value |
+| User | `drupal_user` |
+| Password | `verystrongpassword`, or your `.env` value |
+| Host | `postgres` |
 
-- `./site setup`: Interactively creates `.env`, builds images, and initializes Drupal.
-- `./site start`: Verifies ports 80/443, updates `/etc/hosts`, generates SSL certs, and starts containers.
-- `./site stop`: Stops and removes all containers for the project.
-- `./site restart`: Stops and then starts the environment again.
-- `./site reset`: Danger: Resets the project back to the clean boilerplate state.
+## Management script
 
-## Common Tasks
+| Command | What it does |
+| --- | --- |
+| `./site setup` | Creates `.env` interactively, builds the images, initializes Drupal. |
+| `./site start` | Checks ports 80/443, updates `/etc/hosts`, generates SSL certificates, starts the containers. |
+| `./site stop` | Stops and removes the project containers. |
+| `./site restart` | Stops, then starts the environment again. |
+| `./site reset` | **Warning:** removes everything and resets to the clean boilerplate. |
 
-### Shell Access
-To enter the PHP container and run commands directly:
+## Common tasks
+
+Enter the PHP container and run commands directly:
+
 ```bash
-docker exec -it ${PROJECT_NAME}_php bash
+docker compose exec php bash
 ```
-*(Alternatively, you can use `docker compose exec php bash`)*
 
-### Using Drush
-Drush is installed as a Composer dependency. You can run it easily using the helper script:
-```bash
-./drush [command]
-```
-Example: Clear all caches:
+Run Drush, installed as a Composer dependency, through the helper script. To clear all caches:
+
 ```bash
 ./drush cr
 ```
 
-### Using Composer
-Install new modules or dependencies:
+Install a module with Composer:
+
 ```bash
 docker compose exec php composer require drupal/[module_name]
 ```
 
-### Database Management
-To enter the PostgreSQL shell:
+Open the PostgreSQL shell:
+
 ```bash
 docker compose exec postgres psql -U drupal_user -d drupal_db
 ```
 
-## Project Structure
-- `web/`: Drupal root (index.php, themes, modules).
-- `vendor/`: Composer-managed dependencies and Drush.
-- `nginx.conf.template`: Template for Nginx server configuration.
-- `Dockerfile`: Custom PHP image definition.
-- `docker-compose.yml`: Service orchestration.
+## Project structure
+
+- `web/`, the Drupal root with `index.php`, themes and modules
+- `vendor/`, Composer dependencies and Drush
+- `nginx.conf.template`, the Nginx server configuration template
+- `Dockerfile`, the PHP image
+- `docker-compose.yml`, service orchestration
